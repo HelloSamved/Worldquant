@@ -156,7 +156,7 @@ Identifies equities generating high operating earnings relative to their equity 
    Measures core operating profitability (EBIT level) per dollar of equity value.
 
 2. **Time-Series Percentile Ranking:**
-   $$\alpha_t = \text{ts\_rank}(\text{OI Ratio}_t, 250)$$
+   $$\alpha_t = \operatorname{TSRank}(\text{OI Ratio}_t, 250)$$
    Ranks the current observation $\text{OI Ratio}_t$ against all values in the trailing 250 trading days (approximately 1 calendar trading year):
    $$\alpha_t \in [0, 1]$$
    where $1.0$ indicates that the stock's current operating yield is at its 1-year peak (historically undervalued relative to operating earnings).
@@ -196,17 +196,15 @@ alpha = rank(
 Extracts forward-looking risk premia and directional sentiment embedded in the options volatility surface by quantifying relative demand for upside call options versus downside put options.
 
 #### Mathematical Construction
-1. **Backfilled Implied Volatilities:**
-   $$IV_{\text{call},t} = \text{ts\_backfill}(\text{implied\_volatility\_call\_30}, 5)$$
-   $$IV_{\text{put},t} = \text{ts\_backfill}(\text{implied\_volatility\_put\_30}, 5)$$
-   Carries forward the latest valid implied volatility reading within a 5-day lookback window to eliminate sparse trading gaps.
+1. **5-Day Backfilled Implied Volatilities:**
+   Let $IV_{\text{call},30,t}$ and $IV_{\text{put},30,t}$ denote the 5-day backfilled 30-day implied volatilities for call and put options (retrieved via `ts_backfill(implied_volatility_call_30, 5)` and `ts_backfill(implied_volatility_put_30, 5)`).
 
 2. **Normalized Volatility Spread:**
-   $$S_t = \frac{IV_{\text{call},t} - IV_{\text{put},t}}{IV_{\text{call},t}}$$
+   $$S_t = \frac{IV_{\text{call},30,t} - IV_{\text{put},30,t}}{IV_{\text{call},30,t}}$$
    A positive spread ($S_t > 0$) signifies higher call pricing relative to puts; negative spread indicates elevated put skew.
 
 3. **Cross-Sectional Ranking:**
-   $$\alpha_t = \text{rank}(S_t)$$
+   $$\alpha_t = \operatorname{Rank}(S_t)$$
    Normalizes the relative spread uniformly across all universe constituents into the $[0, 1]$ domain.
 
 #### Data Fields & Operators
@@ -242,15 +240,15 @@ Combines long-horizon media sentiment filtering with short-horizon price reversa
 
 #### Mathematical Construction
 1. **Vector Aggregation & Rolling 60-Day News Accumulation:**
-   $$N_t = \sum_{i=0}^{59} \text{vec\_avg}(\text{nws12\_afterhsz\_sl}_{t-i})$$
-   Aggregates intraday/after-hours news vectors into scalar daily values and sums them over a 60-day rolling window.
+   $$N_t = \sum_{i=0}^{59} \text{News}_{t-i}$$
+   where $\\text{News}_t$ aggregates the daily vector mean of sentiment (ec_avg(nws12_afterhsz_sl)) intraday and after-hours news sentiment vectors into a daily scalar score, summed over a trailing 60-day window.
 
 2. **Cross-Sectional Sentiment Ranking:**
-   $$\text{NewsRank}_t = \text{rank}(N_t)$$
+   $$\text{NewsRank}_t = \operatorname{Rank}(N_t)$$
 
 3. **Conditional Dual-State Alpha:**
-   $$\alpha_{i,t} = \begin{cases} 1, & \text{if } \text{NewsRank}_{i,t} > 0.5 \\ \text{rank}(-\Delta P_{2,i,t}), & \text{otherwise} \end{cases}$$
-   where $\Delta P_{2,i,t} = P_{i,t} - P_{i,t-2}$.
+   $$\alpha_{i,t} = \begin{cases} 1, & \text{if } \text{NewsRank}_{i,t} > 0.5 \\ \operatorname{Rank}(-\Delta P_{2,i,t}), & \text{otherwise} \end{cases}$$
+   where $\Delta P_{2,i,t} = P_{i,t} - P_{i,t-2}$ represents the 2-day price change (`ts_delta(close, 2)`).
 
 #### Data Fields & Operators
 | Item | Type | Description |
@@ -305,10 +303,10 @@ Synthesizes short-term (10-day tenor) options implied volatility skew with an im
 
 3. **Component D (Normalized Volatility Expansion):**
    $$\text{MA}_{20}(C_t) = \frac{1}{20}\sum_{i=0}^{19} C_{t-i}, \quad V_t = \frac{C_t}{\text{MA}_{20}(C_t)}$$
-   $$D_t = \text{rank}(V_t)$$
+   $$D_t = \operatorname{Rank}(V_t)$$
 
 4. **Composite Multi-Factor Synthesis:**
-   $$\alpha_t = \text{rank}(B_t) + D_t = \text{rank}(B_t) + \text{rank}(V_t)$$
+   $$\alpha_t = \operatorname{Rank}(B_t) + D_t = \operatorname{Rank}(B_t) + \operatorname{Rank}(V_t)$$
    Produces a composite score bounded within $[0, 2]$.
 
 #### Data Fields & Operators
@@ -349,16 +347,16 @@ Employs an options open-interest positioning filter to trigger a 10-day rolling 
 
 #### Mathematical Construction
 1. **Entry Gatekeeper Condition:**
-   $$\text{pcr\_oi\_20} < 1.0 \implies \frac{\text{Put Open Interest}_{20}}{\text{Call Open Interest}_{20}} < 1.0$$
+   $$\text{Condition}_t: \quad \text{PCR}_{\text{OI},20} < 1.0 \implies \frac{\text{Put Open Interest}_{20}}{\text{Call Open Interest}_{20}} < 1.0$$
    Only activates trades when call open interest exceeds put open interest (bullish structural positioning).
 
 2. **Rolling 10-Day Time-Series Regression:**
    $$\text{Close}_t = \beta_0 + \beta_1 X_t + \epsilon_t$$
-   where $X_t = \text{ts\_backfill}(\text{call\_breakeven\_20}, 30)$.
+   where $X_t$ is the 30-day backfilled call breakeven level (`ts_backfill(call_breakeven_20, 30)`).
 
 3. **Negative Ranked Output & Trade Execution:**
-   $$\text{Signal}_t = \text{rank}\Big(-1 \times \text{ts\_regression}(\text{close}, X_t, 10)\Big)$$
-   $$\alpha_t = \text{trade\_when}(\text{Condition}_t, \text{Signal}_t, -1)$$
+   $$\text{Signal}_t = \operatorname{Rank}\Big(-1 \times \beta_{10,t}\Big)$$
+   Trade execution is controlled via 	rade_when(pcr_oi_20 < 1, Signal, -1) with continuous holding until re-evaluated.
    The exit parameter `-1` indicates an infinite holding state (no programmatic forced exit).
 
 #### Data Fields & Operators
@@ -395,7 +393,7 @@ Identifies companies with attractive valuation characteristics while penalizing 
 
 #### Mathematical Construction
 1. **Valuation Series Notation:**
-   $$X_t = \text{mdl177\_garpanalystmodel\_qgp\_vfpriceratio}_t$$
+   $$X_t = \text{ValuationRatio}_t = \text{GARP Price Ratio}_t$$
 
 2. **Rolling 30-Day Historical Volatility of Valuation:**
    $$\sigma_{30,t} = \sqrt{\frac{1}{29} \sum_{i=0}^{29} \Big(X_{t-i} - \bar{X}_t\Big)^2}$$
@@ -472,20 +470,23 @@ A regime-switching multi-factor alpha that triggers strictly in high-volatility 
    $$R_t = \frac{P_t}{P_{t-1}} - 1, \quad \sigma_{60,t} = \text{StdDev}(R_{t-59}, \dots, R_t)$$
 
 2. **Regime Activation Gatekeeper:**
-   $$\text{when}_t = \mathbb{I}\Big[\text{ts\_rank}(\sigma_{60,t}, 126) > 0.65\Big]$$
+   $$\text{when}_t = \mathbb{I}\Big[\operatorname{TSRank}(\sigma_{60,t}, 126) > 0.65\Big]$$
 
 3. **Sub-Component Formulations:**
-   - **Volatility-Adjusted 2-Day Mean Reversion (50% weight):**
-     $$\text{mr\_component}_t = -\text{rank}\left(\frac{(P_t - P_{t-2})/P_{t-2}}{\text{StdDev}_{20}(R)}\right)$$
-   - **Relative Volume Acceleration (25% weight):**
-     $$\text{vol\_component}_t = \text{rank}\left(\frac{\text{Volume}_t}{\text{ADV20}_t}\right)$$
-   - **Contrarian Social Buzz Penalty (12.5% weight):**
-     $$\text{buzz\_avg}_t = -\text{vec\_avg}(\text{scl12\_alltype\_buzzvec}_t)$$
-   - **Social Sentiment Ranking (12.5% weight):**
-     $$\text{sentiment\_component}_t = \text{rank}(\text{scl12\_sentiment}_t)$$
+   - **Volatility-Adjusted 2-Day Mean Reversion ($S_{\text{MR},t}$, 50% weight):**
+     $$S_{\text{MR},t} = -\operatorname{Rank}\left(\frac{(P_t - P_{t-2})/P_{t-2}}{\sigma_{20,t}}\right)$$
+     where $\sigma_{20,t} = \operatorname{StdDev}_{20}(R)$.
+   - **Relative Volume Acceleration ($S_{\text{Vol},t}$, 25% weight):**
+     $$S_{\text{Vol},t} = \operatorname{Rank}\left(\frac{\text{Volume}_t}{\text{ADV20}_t}\right)$$
+   - **Contrarian Social Buzz Penalty ($S_{\text{Buzz},t}$, 12.5% weight):**
+     $$S_{\text{Buzz},t} = -\overline{\text{Buzz}}_t$$
+     where $\overline{\text{Buzz}}_t$ represents the vector mean of discussion activity (`vec_avg(scl12_alltype_buzzvec)`).
+   - **Social Sentiment Ranking ($S_{\text{Sent},t}$, 12.5% weight):**
+     $$S_{\text{Sent},t} = \operatorname{Rank}(\text{Sentiment}_t)$$
+     where $\text{Sentiment}_t$ is the NLP sentiment score (`scl12_sentiment`).
 
 4. **Composite Linear Factor Weighting:**
-   $$\alpha_t = 0.50 \cdot \text{mr\_component} + 0.25 \cdot \text{vol\_component} + 0.125 \cdot \text{buzz\_avg} + 0.125 \cdot \text{sentiment\_component}$$
+   $$\alpha_t = 0.50 \cdot S_{\text{MR},t} + 0.25 \cdot S_{\text{Vol},t} + 0.125 \cdot S_{\text{Buzz},t} + 0.125 \cdot S_{\text{Sent},t}$$
 
 ```
 Factor Weight Allocation:
@@ -574,11 +575,12 @@ Synchronizes fundamental analyst revisions in operating cash flow with instituti
    $$\text{when}_t = \text{Volume}_t > \text{ADV5}_t$$
 
 3. **Smoothed Fundamental Signal & Ranking:**
-   $$\text{CFF\_Smoothed}_t = \frac{1}{5}\sum_{i=0}^4 \text{anl4\_cff\_flag}_{t-i}$$
-   $$\alpha_t = \text{rank}(\text{CFF\_Smoothed}_t)$$
+   $$\overline{\text{CFF}}_t = \frac{1}{5}\sum_{i=0}^4 \text{CFF}_{t-i}$$
+   $$\alpha_t = \operatorname{Rank}\left(\overline{\text{CFF}}_t\right)$$
+   where $\text{CFF}_t$ represents the daily analyst cash flow flag (`anl4_cff_flag`), smoothed over 5 trading days.
 
 4. **Conditional Trade Execution:**
-   $$\text{Execution} = \text{trade\_when}(\text{when}_t, \alpha_t, -1)$$
+   The strategy executes entries via `trade_when(when, alpha, -1)` when current trading volume exceeds its 5-day moving average, maintaining active exposure until re-evaluated.
 
 #### Data Fields & Operators
 | Item | Type | Description |
