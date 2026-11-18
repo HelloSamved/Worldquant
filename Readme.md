@@ -156,7 +156,7 @@ Identifies equities generating high operating earnings relative to their equity 
    Measures core operating profitability (EBIT level) per dollar of equity value.
 
 2. **Time-Series Percentile Ranking:**
-   $$\alpha_t = \operatorname{TSRank}(\text{OI Ratio}_t, 250)$$
+   $$\alpha_t = \text{TSRank}(\text{OI Ratio}_t, 250)$$
    Ranks the current observation $\text{OI Ratio}_t$ against all values in the trailing 250 trading days (approximately 1 calendar trading year):
    $$\alpha_t \in [0, 1]$$
    where $1.0$ indicates that the stock's current operating yield is at its 1-year peak (historically undervalued relative to operating earnings).
@@ -204,7 +204,7 @@ Extracts forward-looking risk premia and directional sentiment embedded in the o
    A positive spread ($S_t > 0$) signifies higher call pricing relative to puts; negative spread indicates elevated put skew.
 
 3. **Cross-Sectional Ranking:**
-   $$\alpha_t = \operatorname{Rank}(S_t)$$
+   $$\alpha_t = \text{Rank}(S_t)$$
    Normalizes the relative spread uniformly across all universe constituents into the $[0, 1]$ domain.
 
 #### Data Fields & Operators
@@ -244,10 +244,10 @@ Combines long-horizon media sentiment filtering with short-horizon price reversa
    where $\\text{News}_t$ aggregates the daily vector mean of sentiment (ec_avg(nws12_afterhsz_sl)) intraday and after-hours news sentiment vectors into a daily scalar score, summed over a trailing 60-day window.
 
 2. **Cross-Sectional Sentiment Ranking:**
-   $$\text{NewsRank}_t = \operatorname{Rank}(N_t)$$
+   $$\text{NewsRank}_t = \text{Rank}(N_t)$$
 
 3. **Conditional Dual-State Alpha:**
-   $$\alpha_{i,t} = \begin{cases} 1, & \text{if } \text{NewsRank}_{i,t} > 0.5 \\ \operatorname{Rank}(-\Delta P_{2,i,t}), & \text{otherwise} \end{cases}$$
+   $$\alpha_{i,t} = \begin{cases} 1, & \text{if } \text{NewsRank}_{i,t} > 0.5 \\ \text{Rank}(-\Delta P_{2,i,t}), & \text{otherwise} \end{cases}$$
    where $\Delta P_{2,i,t} = P_{i,t} - P_{i,t-2}$ represents the 2-day price change (`ts_delta(close, 2)`).
 
 #### Data Fields & Operators
@@ -303,10 +303,10 @@ Synthesizes short-term (10-day tenor) options implied volatility skew with an im
 
 3. **Component D (Normalized Volatility Expansion):**
    $$\text{MA}_{20}(C_t) = \frac{1}{20}\sum_{i=0}^{19} C_{t-i}, \quad V_t = \frac{C_t}{\text{MA}_{20}(C_t)}$$
-   $$D_t = \operatorname{Rank}(V_t)$$
+   $$D_t = \text{Rank}(V_t)$$
 
 4. **Composite Multi-Factor Synthesis:**
-   $$\alpha_t = \operatorname{Rank}(B_t) + D_t = \operatorname{Rank}(B_t) + \operatorname{Rank}(V_t)$$
+   $$\alpha_t = \text{Rank}(B_t) + D_t = \text{Rank}(B_t) + \text{Rank}(V_t)$$
    Produces a composite score bounded within $[0, 2]$.
 
 #### Data Fields & Operators
@@ -355,8 +355,8 @@ Employs an options open-interest positioning filter to trigger a 10-day rolling 
    where $X_t$ is the 30-day backfilled call breakeven level (`ts_backfill(call_breakeven_20, 30)`).
 
 3. **Negative Ranked Output & Trade Execution:**
-   $$\text{Signal}_t = \operatorname{Rank}\Big(-1 \times \beta_{10,t}\Big)$$
-   Trade execution is controlled via 	rade_when(pcr_oi_20 < 1, Signal, -1) with continuous holding until re-evaluated.
+   $$\text{Signal}_t = \text{Rank}\left(-1 \times \beta_{10,t}\right)$$
+   Trade execution is controlled via `trade_when(pcr_oi_20 < 1, Signal, -1)` with continuous holding until re-evaluated.
    The exit parameter `-1` indicates an infinite holding state (no programmatic forced exit).
 
 #### Data Fields & Operators
@@ -396,10 +396,10 @@ Identifies companies with attractive valuation characteristics while penalizing 
    $$X_t = \text{ValuationRatio}_t = \text{GARP Price Ratio}_t$$
 
 2. **Rolling 30-Day Historical Volatility of Valuation:**
-   $$\sigma_{30,t} = \sqrt{\frac{1}{29} \sum_{i=0}^{29} \Big(X_{t-i} - \bar{X}_t\Big)^2}$$
+   $$\sigma_{30,t} = \sqrt{\frac{1}{29} \sum_{i=0}^{29} \left(X_{t-i} - \mu_t\right)^2}$$
 
 3. **Risk-Penalized Alpha Construction:**
-   $$\alpha_t = -1 \times \Big(X_t \cdot \sigma_{30,t}\Big)$$
+   $$\alpha_t = -1 \times \left(X_t \cdot \sigma_{30,t}\right)$$
    Assuming $X_t > 0$, an elevated valuation ratio combined with large estimation swings produces an aggressive short penalty.
 
 #### Data Fields & Operators
@@ -470,19 +470,19 @@ A regime-switching multi-factor alpha that triggers strictly in high-volatility 
    $$R_t = \frac{P_t}{P_{t-1}} - 1, \quad \sigma_{60,t} = \text{StdDev}(R_{t-59}, \dots, R_t)$$
 
 2. **Regime Activation Gatekeeper:**
-   $$\text{when}_t = \mathbb{I}\Big[\operatorname{TSRank}(\sigma_{60,t}, 126) > 0.65\Big]$$
+   $$\text{when}_t = \left[ \text{TSRank}(\sigma_{60,t}, 126) > 0.65 \right]$$
 
 3. **Sub-Component Formulations:**
    - **Volatility-Adjusted 2-Day Mean Reversion ($S_{\text{MR},t}$, 50% weight):**
-     $$S_{\text{MR},t} = -\operatorname{Rank}\left(\frac{(P_t - P_{t-2})/P_{t-2}}{\sigma_{20,t}}\right)$$
-     where $\sigma_{20,t} = \operatorname{StdDev}_{20}(R)$.
+     $$S_{\text{MR},t} = -\text{Rank}\left(\frac{(P_t - P_{t-2})/P_{t-2}}{\sigma_{20,t}}\right)$$
+     where $\sigma_{20,t} = \text{StdDev}_{20}(R)$.
    - **Relative Volume Acceleration ($S_{\text{Vol},t}$, 25% weight):**
-     $$S_{\text{Vol},t} = \operatorname{Rank}\left(\frac{\text{Volume}_t}{\text{ADV20}_t}\right)$$
+     $$S_{\text{Vol},t} = \text{Rank}\left(\frac{\text{Volume}_t}{\text{ADV20}_t}\right)$$
    - **Contrarian Social Buzz Penalty ($S_{\text{Buzz},t}$, 12.5% weight):**
-     $$S_{\text{Buzz},t} = -\overline{\text{Buzz}}_t$$
-     where $\overline{\text{Buzz}}_t$ represents the vector mean of discussion activity (`vec_avg(scl12_alltype_buzzvec)`).
+     $$S_{\text{Buzz},t} = -\text{Buzz}_t$$
+     where $\text{Buzz}_t$ represents the vector mean of discussion activity (`vec_avg(scl12_alltype_buzzvec)`).
    - **Social Sentiment Ranking ($S_{\text{Sent},t}$, 12.5% weight):**
-     $$S_{\text{Sent},t} = \operatorname{Rank}(\text{Sentiment}_t)$$
+     $$S_{\text{Sent},t} = \text{Rank}(\text{Sentiment}_t)$$
      where $\text{Sentiment}_t$ is the NLP sentiment score (`scl12_sentiment`).
 
 4. **Composite Linear Factor Weighting:**
@@ -575,8 +575,8 @@ Synchronizes fundamental analyst revisions in operating cash flow with instituti
    $$\text{when}_t = \text{Volume}_t > \text{ADV5}_t$$
 
 3. **Smoothed Fundamental Signal & Ranking:**
-   $$\overline{\text{CFF}}_t = \frac{1}{5}\sum_{i=0}^4 \text{CFF}_{t-i}$$
-   $$\alpha_t = \operatorname{Rank}\left(\overline{\text{CFF}}_t\right)$$
+   $$\text{CFF}_{5,t} = \frac{1}{5}\sum_{i=0}^4 \text{CFF}_{t-i}$$
+   $$\alpha_t = \text{Rank}\left(\text{CFF}_{5,t}\right)$$
    where $\text{CFF}_t$ represents the daily analyst cash flow flag (`anl4_cff_flag`), smoothed over 5 trading days.
 
 4. **Conditional Trade Execution:**
@@ -608,7 +608,7 @@ Fundamental analyst revisions often go unnoticed until institutional trading vol
 | `rank` | `rank(x)` | $\frac{\text{Rank of } x_{i,t} \text{ among all assets in universe } N_t}{N_t}$ | Cross-sectional percentile ranking across universe |
 | `ts_mean` | `ts_mean(x, d)` | $\frac{1}{d} \sum_{i=0}^{d-1} x_{t-i}$ | Rolling trendline smoothing, baseline averaging |
 | `ts_sum` | `ts_sum(x, d)` | $\sum_{i=0}^{d-1} x_{t-i}$ | Cumulative accumulation (realized variance, sentiment sums) |
-| `ts_std_dev` | `ts_std_dev(x, d)` | $\sqrt{\frac{1}{d-1}\sum_{i=0}^{d-1}(x_{t-i}-\bar{x})^2}$ | Historical volatility estimation, signal risk scaling |
+| `ts_std_dev` | `ts_std_dev(x, d)` | $\sqrt{\frac{1}{d-1}\sum_{i=0}^{d-1}(x_{t-i}-\mu)^2}$ | Historical volatility estimation, signal risk scaling |
 | `ts_backfill` | `ts_backfill(x, d)` | Returns most recent non-NaN value within window $d$ | Handling sparse data (options surfaces, analyst flags) |
 | `vec_avg` | `vec_avg(x)` | $\frac{1}{K}\sum_{k=1}^K x[k]$ | Compressing vector-valued alternative data into a scalar |
 | `power` | `power(x, n)` | $x^n$ | Non-linear signal amplification, squared returns ($R^2$) |
@@ -684,11 +684,11 @@ Ensure backtest universes encompass historical delistings, bankruptcies, and cor
 
 ### 4. Transaction Costs & Turnover Decay
 High-frequency reversal alphas (e.g., Alpha 1, Alpha 4, Alpha 8) generate significant portfolio turnover. Slippage models incorporating market impact, bid-ask spreads, and borrow costs for short legs must be applied:
-$$\text{Net Return}_t = \text{Gross Return}_t - \text{Turnover}_t \times \Big(\text{Fee} + \text{Slippage}\Big)$$
+$$\text{Net Return}_t = \text{Gross Return}_t - \text{Turnover}_t \times \left(\text{Fee} + \text{Slippage}\right)$$
 
 ### 5. Factor Risk Neutralization
 Raw alphas can inadvertently take on passive exposures to systemic risk factors (e.g., Size, Value, Momentum, Industry, Market Beta). True alpha generation requires neutralizing signals against Barra-style factor risk models:
-$$\alpha_{\text{pure}} = \alpha_{\text{raw}} - \mathbf{X}(\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T \alpha_{\text{raw}}$$
+$$\alpha_{\text{pure}} = \alpha_{\text{raw}} - X(X^TX)^{-1}X^T \alpha_{\text{raw}}$$
 
 ### 6. Robustness & Parameter Sensitivity Testing
 Robust alphas should exhibit stability across parameter neighborhoods rather than isolated peaks of overfitted performance. Parameter sweeps should be executed:
